@@ -1,0 +1,4 @@
+- name: "OpenLDAP directory server config specific to Perun"
+  import_tasks: perun_ldap_config.yml
+  tags:
+    - perun_ldap_config
