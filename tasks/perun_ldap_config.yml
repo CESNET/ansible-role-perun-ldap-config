@@ -80,6 +80,37 @@
         - assignedGroupId eq
     state: exact
 
+- name: "LDAP access rules"
+  block:
+    - name: "LDAP access rules empty"
+      set_fact:
+        olcAccess_values: []
+        oldAccess_replication:
+          - >-
+            to dn.subtree="{{ perun_ldap_basedn }}"
+            by dn.exact="cn=replication,{{ perun_ldap_basedn }}" read
+            by * break
+    - name: "LDAP access rule for replication must be first"
+      when: perun_ldap_master_replica
+      set_fact:
+        olcAccess_values: "{{ olcAccess_values + oldAccess_replication }}"
+    - name: "LDAP access rules start"
+      set_fact:
+        olcAccess_values: "{{ olcAccess_values + perun_ldap_access_rules_start }}"
+    - name: "additional LDAP access rules"
+      set_fact:
+        olcAccess_values: "{{ olcAccess_values + perun_ldap_access_rules_additional }}"
+    - name: "LDAP access rules end"
+      set_fact:
+        olcAccess_values: "{{ olcAccess_values + perun_ldap_access_rules_end }}"
+    - name: "modify OpenLDAP access rights"
+      ldap_attrs:
+        dn: olcDatabase={1}mdb,cn=config
+        attributes:
+          olcAccess: "{{ olcAccess_values }}"
+        ordered: yes
+        state: exact
+
 - name: "get OS service facts"
   when: ansible_facts.services['slapd'] is not defined
   service_facts:
