@@ -1,6 +1,8 @@
 - assert:
     that:
       - perun_ldap_schemas_perun_version is defined
+      - perun_ldap_access_rules_additional is defined
+      - perun_ldap_domain is defined
 
 - name: "set cn=config attribute olcAttributeOptions: x-ns-"
   ldap_attrs:
