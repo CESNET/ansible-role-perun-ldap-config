@@ -27,3 +27,7 @@ perun_ldap_access_rules_end:
     by users search
     by * break
 perun_ldap_access_rules_additional: []
+perun_ldap_backup_hostel: no
+perun_ldap_daily_backup_hour: 20
+perun_ldap_daily_backup_minute: 45
+

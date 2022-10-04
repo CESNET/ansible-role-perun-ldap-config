@@ -113,6 +113,16 @@
         ordered: yes
         state: exact
 
+- name: "cron job for backup of second LDAP branch with hostel passwords"
+  when: perun_ldap_backup_hostel
+  cron:
+    name: "Everyday do backup of the LDAP hostel branch"
+    cron_file: ldap-backup
+    hour: "{{ perun_ldap_daily_backup_hour | string }}"
+    minute: "{{ perun_ldap_daily_backup_minute | string }}"
+    user: root
+    job: "umask 027 ; rm /etc/ldap/ldap_db_2_backup.ldif ; /usr/sbin/slapcat -n 2 -l /etc/ldap/ldap_db_2_backup.ldif"
+
 - name: "get OS service facts"
   when: ansible_facts.services['slapd'] is not defined
   service_facts:
