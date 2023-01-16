@@ -16,7 +16,7 @@
     dn: cn={4}perun,cn=schema,cn=config
     objectClass: olcSchemaConfig
   register: perun_schema_entry
-- name: "download schema perun file"
+- name: "download schema perun file version {{ perun_ldap_schemas_perun_version }}"
   get_url:
     url: "https://raw.githubusercontent.com/CESNET/perun/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/perun-schema.ldif"
     dest: "/etc/ldap/perun-schema.ldif"
@@ -31,7 +31,7 @@
     dn: cn={5}inetUser,cn=schema,cn=config
     objectClass: olcSchemaConfig
   register: inetUser_schema_entry
-- name: "download schema inetUser file"
+- name: "download schema inetUser file version {{ perun_ldap_schemas_perun_version }}"
   get_url:
     url: "https://raw.githubusercontent.com/CESNET/perun/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/inetUser-schema.ldif"
     dest: "/etc/ldap/inetUser-schema.ldif"
@@ -46,7 +46,7 @@
     dn: cn={6}tenOperEntry,cn=schema,cn=config
     objectClass: olcSchemaConfig
   register: tenOperEntry_schema_entry
-- name: "download schema tenOperEntry file"
+- name: "download schema tenOperEntry file version {{ perun_ldap_schemas_perun_version }}"
   get_url:
     url: "https://raw.githubusercontent.com/CESNET/perun/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/tenOperEntry-schema.ldif"
     dest: "/etc/ldap/tenOperEntry-schema.ldif"
