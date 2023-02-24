@@ -2,6 +2,8 @@ perun_ldap_schemas_perun_version: production
 perun_ldap_domain: "example.org"
 perun_ldap_basedn: '{{ "dc=" + perun_ldap_domain.split(".") | join(",dc=") }}'
 perun_ldap_master_replica: no
+perun_ldap_slave_replica: no
+perun_ldap_slave_replica_enable_schema_sync: no
 perun_ldap_access_rules_start:
   # value are in YAML folded style (newlines are replaced with spaces) with chomping (no newline at the end)
   - >-
