@@ -21,7 +21,7 @@
       register: perun_schema_entry
     - name: "download schema perun file version {{ perun_ldap_schemas_perun_version }}"
       get_url:
-        url: "https://raw.githubusercontent.com/CESNET/perun/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/perun-schema.ldif"
+        url: "https://gitlab.ics.muni.cz/perun/perun-idm/perun/-/raw/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/perun-schema.ldif"
         dest: "/etc/ldap/perun-schema.ldif"
         force: yes
       register: perun_schema_file
@@ -36,7 +36,7 @@
       register: inetUser_schema_entry
     - name: "download schema inetUser file version {{ perun_ldap_schemas_perun_version }}"
       get_url:
-        url: "https://raw.githubusercontent.com/CESNET/perun/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/inetUser-schema.ldif"
+        url: "https://gitlab.ics.muni.cz/perun/perun-idm/perun/-/raw/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/inetUser-schema.ldif"
         dest: "/etc/ldap/inetUser-schema.ldif"
         force: yes
       register: inetUser_schema_file
@@ -51,7 +51,7 @@
       register: tenOperEntry_schema_entry
     - name: "download schema tenOperEntry file version {{ perun_ldap_schemas_perun_version }}"
       get_url:
-        url: "https://raw.githubusercontent.com/CESNET/perun/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/tenOperEntry-schema.ldif"
+        url: "https://gitlab.ics.muni.cz/perun/perun-idm/perun/-/raw/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/tenOperEntry-schema.ldif"
         dest: "/etc/ldap/tenOperEntry-schema.ldif"
         force: yes
       register: tenOperEntry_schema_file
