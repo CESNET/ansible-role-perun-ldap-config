@@ -1,4 +1,4 @@
-perun_ldap_schemas_perun_version: production
+perun_ldap_schemas_perun_version: "{{ perun_rpc_git_version }}"
 perun_ldap_domain: "example.org"
 perun_ldap_basedn: '{{ "dc=" + perun_ldap_domain.split(".") | join(",dc=") }}'
 perun_ldap_master_replica: no
