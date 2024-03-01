@@ -86,6 +86,7 @@
     state: exact
 
 - name: "LDAP access rules"
+  tags: ldap_acl
   block:
     - name: "LDAP access rules empty"
       set_fact:
