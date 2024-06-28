@@ -1,12 +1,19 @@
 - name: "OpenLDAP directory server config specific to Perun"
-  import_tasks: perun_ldap_config.yml
-  when: perun_ldap_local
+  when: perun_ldap_implementation=="openldap"
+  include_tasks:
+    file: perun_openldap_config.yml
+    apply:
+      tags:
+        - perun_ldap_config
   tags:
     - perun_ldap_config
 
-
 - name: "LDAP DS389 directory server config specific to Perun"
-  import_tasks: perun_ldap_ds389_config.yml
-  when: perun_ldap_ds389_local 
+  when: perun_ldap_implementation=="ds389"
+  include_tasks:
+    file: perun_ds389_config.yml
+    apply:
+      tags:
+        - perun_ldap_config
   tags:
-     - perun_ldap_ds389_config      
+     - perun_ldap_config

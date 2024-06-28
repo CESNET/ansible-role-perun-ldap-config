@@ -1,0 +1,188 @@
+# # # # ################################  Custom schema application part #############
+
+- name: "assert variables"
+  assert:
+    that:
+      - perun_ldap_schemas_perun_version is defined
+      - perun_ldap_basedn is defined
+      - perun_ldap_data_admin_dn is defined
+      - perun_ldap_data_password is defined
+      - perun_ldap_ds389_instance_name is defined
+      - perun_ldap_ds389_server_name is defined
+      - perun_ldap_ds389_aci_content is defined
+
+- name: "Check, if the directory exist"
+  ansible.builtin.stat:
+        path: "/tmp/schemas/"
+  register: directory
+
+- name: "Create directory"
+  ansible.builtin.file:
+        path: "/tmp/schemas/"
+        state: directory
+        owner: root
+        group: root 
+        mode: '0770'
+  when: not directory.stat.exists
+
+- name: "Download schema inetUser file version {{ perun_ldap_schemas_perun_version }}"
+  when: not directory.stat.exists
+  get_url:
+    url: "https://gitlab.ics.muni.cz/perun/perun-idm/perun/-/raw/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/inetUser-schema.ldif"
+    dest: "/tmp/schemas/inetUser-schema.ldif"
+    owner: root
+    group: root
+    mode: '0660'
+    force: yes
+  register: schemafile1
+
+- name: "Download schema perun file version {{ perun_ldap_schemas_perun_version }}"
+  when: not directory.stat.exists
+  get_url:
+    url: "https://gitlab.ics.muni.cz/perun/perun-idm/perun/-/raw/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/perun-schema.ldif"
+    dest:  "/tmp/schemas/perun-schema.ldif"
+    force: yes
+    owner: root
+    group: root
+    mode: '0660'
+  register: schemafile2
+
+- name: "Download schema tenOperEntry file version {{ perun_ldap_schemas_perun_version }}"
+  when: not directory.stat.exists
+  get_url:
+    url: "https://gitlab.ics.muni.cz/perun/perun-idm/perun/-/raw/{{ perun_ldap_schemas_perun_version }}/perun-utils/ldapc-scripts/schemas/tenOperEntry-schema.ldif"
+    dest:  "/tmp/schemas/tenOperEntry-schema.ldif"
+    force: yes
+    owner: root
+    group: root
+    mode: '0660'
+  register: schemafile3
+
+- name: "Run script for changes schemas from Open to 389"
+  when: schemafile1.changed or schemafile2.changed or schemafile3.changed
+  ansible.builtin.shell: |
+        python3 -c "
+        import os
+        import re
+
+        # Way to directory
+        input_directory = '.'
+        # Way to directory, where will be saved new files
+        output_directory = '.'
+
+        # Name of attributes, need to be comment
+        search_strings = ['1.3.6.1.4.1.8057.2.80.35', '1.3.6.1.4.1.8057.2.80.48']  # Change 'RETAZEC1', 'RETAZEC2', 'RETAZEC3' to what you need to comment
+
+        print('Step X finish')
+
+        # Create output directory if it does not exist
+        os.makedirs(output_directory, exist_ok=True)
+
+        # Browse all files in a folder
+        for filename in os.listdir(input_directory):
+            if filename.endswith('.ldif'):
+                input_file_path = os.path.join(input_directory, filename)
+                # Set 389 to the name of the file
+                base, ext = os.path.splitext(filename)
+                output_file_path = os.path.join(output_directory, f'{base}389{ext}')
+
+                # Load the contents of the file
+                with open(input_file_path, 'r') as input_file:
+                    input_string = input_file.readlines()
+
+                # Process strings and comment out lines containing any of the search strings
+                updated_lines = []
+                for line in input_string:
+                    if any(search_string in line for search_string in search_strings):
+                        updated_lines.append('#' + line)
+                    else:
+                        updated_lines.append(line)
+
+                # Merging strings back into one
+                cleaned_string = ''.join(updated_lines)
+
+                # Change header to 'dn: cn=schema'
+                cleaned_string = re.sub(r'dn:.*', 'dn: cn=schema', cleaned_string)
+
+                # Removing 'olc' and text in square brackets including them
+                cleaned_string = cleaned_string.replace('olc', '')
+                cleaned_string = re.sub(r'\s*\{.*?\}', '', cleaned_string)
+
+                # Replacing 'replace:' with 'add:'
+                cleaned_string = cleaned_string.replace('replace:', 'add:')
+
+                # Saving the resulting string to a file
+                with open(output_file_path, 'w') as output_file:
+                    output_file.write(cleaned_string)
+
+                print(f'Edited file saved as: {output_file_path}')
+
+        print('FINISH')
+        "
+  args:
+      chdir: /tmp/schemas
+  register: result
+
+- name: "read schema"
+  community.general.ldap_search:
+    server_uri: "ldaps://{{ perun_ldap_ds389_server_name }}"
+    bind_dn: "{{ perun_ldap_data_admin_dn }}"
+    bind_pw: "{{ perun_ldap_data_password }}"
+    dn: cn=schema
+    scope: base
+    attrs:
+      - objectClasses
+  register: schema_obj
+
+- name: "Applying schemas"
+  block:
+      - name: "applying inetUser-schema389.ldif"
+        when: schema_obj.results[0].objectClasses|select('search','inetUser')| count == 0
+        shell:
+          cmd: >-
+            ldapmodify -x -D "{{ perun_ldap_data_admin_dn }}" -w "{{ perun_ldap_data_password }}"
+            -H "ldaps://{{ perun_ldap_ds389_server_name }}:636" -f "/tmp/schemas/inetUser-schema389.ldif"
+        register: applied_schema1
+      - name: "applying perun-schema389.ldif2"
+        when: schema_obj.results[0].objectClasses|select('search','perunUser')| count == 0
+        shell:
+          cmd: >-
+           ldapmodify -x -D "{{ perun_ldap_data_admin_dn }}" -w "{{ perun_ldap_data_password }}"    
+           -H "ldaps://{{ perun_ldap_ds389_server_name }}:636" -f "/tmp/schemas/perun-schema389.ldif"
+        register: applied_schema2
+      - name: "applying tenOperEntry-schema389.ldif"
+        when: schema_obj.results[0].objectClasses|select('search','tenOperEntry')| count == 0
+        shell:
+          cmd: >-
+            ldapmodify -x -D "{{ perun_ldap_data_admin_dn }}" -w "{{ perun_ldap_data_password }}"
+            -H "ldaps://{{ perun_ldap_ds389_server_name }}:636" -f "/tmp/schemas/tenOperEntry-schema389.ldif"
+        register: applied_schema3
+
+- name: "Restart 389 DS"
+  when: applied_schema1.changed or applied_schema2.changed or applied_schema3.changed
+  systemd:
+    name: dirsrv@{{ perun_ldap_ds389_instance_name }}
+    state: restarted
+    enabled: yes
+
+- name: "Set the maxbersize on 16MB"
+  community.general.ldap_attrs:
+    server_uri: "ldaps://{{ perun_ldap_ds389_server_name }}"
+    bind_dn: "{{ perun_ldap_data_admin_dn }}"
+    bind_pw: "{{ perun_ldap_data_password }}"
+    dn: cn=config
+    state: exact
+    attributes:
+      nsslapd-maxbersize: 16777216
+
+- name: "Change ACI when not"
+  community.general.ldap_attrs:
+     dn: "{{ perun_ldap_basedn }}"
+     bind_dn: "{{ perun_ldap_data_admin_dn }}"
+     bind_pw: "{{ perun_ldap_data_password }}"
+     server_uri: "ldaps://{{ perun_ldap_ds389_server_name }}:636"
+     attributes: 
+       aci: 
+          "{{ perun_ldap_ds389_aci_content }}"
+     state: exact
+
