@@ -83,6 +83,7 @@
         - perunUserId eq
         - perunGroupId eq
         - assignedGroupId eq
+        - internalUserIdentifiers eq
     state: exact
 
 - name: "LDAP access rules"
@@ -130,3 +131,52 @@
 - name: "get OS service facts"
   when: ansible_facts.services['slapd'] is not defined
   service_facts:
+
+- name: "Add limits to /etc/security/limits.conf"
+  lineinfile:
+        path: /etc/security/limits.conf
+        state: present
+        line: "{{ item }}"
+  loop:
+    - 'openldap soft nofile 20480'
+    - 'openldap hard nofile 40960'
+  notify: Reload limits
+
+- name: "Add system limit to /etc/sysctl.conf"
+  lineinfile:
+        path: /etc/sysctl.conf
+        state: present
+        line: 'fs.file-max = 500000'
+  notify: Reload sysctl
+
+- name: "Create systemd override config directory if it does not exist"
+  file:
+        path: /etc/systemd/system/slapd.service.d
+        state: directory
+        mode: '0755'
+
+- name: "Add LimitNOFILE to /etc/systemd/system/slapd.service.d/override.conf"
+  blockinfile:
+        path: /etc/systemd/system/slapd.service.d/override.conf
+        create: yes
+        block: |
+          [Service]
+          LimitNOFILE=40960
+  notify: Reload systemd
+
+- name: "Check open file limit using ulimit"
+  command: bash -c 'ulimit -n'
+  register: ulimit_result
+  changed_when: false
+
+- name: "Check system open file limit using sysctl"
+  command: sysctl fs.file-max
+  register: sysctl_result
+  changed_when: false
+
+- name: "Display results of limit checks"
+  debug:
+        msg:
+          - "Current open file limit (ulimit -n): {{ ulimit_result.stdout }}"
+          - "System max open files limit (fs.file-max): {{ sysctl_result.stdout }}"
+

@@ -125,7 +125,7 @@
 
 - name: "read schema"
   community.general.ldap_search:
-    server_uri: "ldaps://{{ perun_ldap_ds389_server_name }}"
+    server_uri: "ldaps://{{ perun_ldap_ds389_server_name }}:636"
     bind_dn: "{{ perun_ldap_data_admin_dn }}"
     bind_pw: "{{ perun_ldap_data_password }}"
     dn: cn=schema
@@ -133,6 +133,7 @@
     attrs:
       - objectClasses
   register: schema_obj
+ 
 
 - name: "Applying schemas"
   block:
@@ -186,3 +187,56 @@
           "{{ perun_ldap_ds389_aci_content }}"
      state: exact
 
+- name: "Check and add missing LDAP indexes"
+  shell: |
+    indexes="
+    cn eq
+    uid eq
+    member eq
+    memberUid eq
+    objectClass eq
+    uidNumber eq
+    gidNumber eq
+    perunVoId eq
+    eduPersonPrincipalNames eq
+    entryCSN eq
+    entryUUID eq
+    login eq
+    memberOfPerunVo eq
+    userCertificateSubject eq
+    entityID eq
+    assignedToResourceId eq
+    userIdentities eq
+    OIDCClientID eq
+    perunFacilityId eq
+    perunFacilityDn eq
+    perunUserId eq
+    perunGroupId eq
+    assignedGroupId eq
+    internalUserIdentifiers eq"
+  
+    echo "$indexes" | while read -r line; do
+      attrs=$(echo $line | cut -d' ' -f1)
+      types=$(echo $line | cut -d' ' -f2)
+      for attr in $(echo $attrs | tr ',' ' '); do
+        if ! dsconf {{ perun_ldap_ds389_instance_name }} backend index list userroot | grep  "cn=$attr"; then
+          dsconf {{ perun_ldap_ds389_instance_name }} backend index add --index-type $types --attr $attr userroot
+        fi
+      done
+    done
+  register: add_indexes_output
+
+- name: "Reindex missing indexes"
+  when: add_indexes_output.changed
+  shell: |
+    dsconf {{ perun_ldap_ds389_instance_name }} backend index reindex userroot
+  
+- name: "Create a cron job for LDAP backup"
+  cron:
+       name: "Everyday do backup of the LDAP hostel branch"
+       cron_file: ldap-backup
+       hour: "{{ perun_ldap_daily_backup_hour | string }}"
+       minute: "{{ perun_ldap_daily_backup_minute | string }}"
+       user: root
+       job: 
+         "dsconf {{ perun_ldap_ds389_instance_name }} backup create"
