@@ -29,6 +29,13 @@ perun_ldap_access_rules_end:
     by users search
     by * break
 perun_ldap_access_rules_additional: []
+
+perun_ldap_ds389_aci_content:
+  - (targetattr="userPassword") (version 3.0; acl "Allow users updating their password"; allow (write) userdn="ldap:///self";)
+  - (targetattr="shadowLastChange")(version 3.0; acl "Shadow last change access"; allow (write) userdn="ldap:///self"; allow (read) userdn="ldap:///all";)
+  - (target="ldap:///{{ perun_ldap_basedn }}")(version 3.0; acl "Self read access"; allow (read) userdn="ldap:///self";)
+  - (target="ldap:///{{ perun_ldap_basedn }}")(version 3.0; acl "User search access"; allow (search) userdn="ldap:///users";)
+
 perun_ldap_backup_hostel: no
 perun_ldap_daily_backup_hour: 20
 perun_ldap_daily_backup_minute: 45
