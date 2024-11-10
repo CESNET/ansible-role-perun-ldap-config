@@ -39,4 +39,8 @@ perun_ldap_ds389_aci_content:
 perun_ldap_backup_hostel: no
 perun_ldap_daily_backup_hour: 20
 perun_ldap_daily_backup_minute: 45
+#set var for max open file limit for LS
+perun_ldap_max_open_files_limits: false
+
+
 

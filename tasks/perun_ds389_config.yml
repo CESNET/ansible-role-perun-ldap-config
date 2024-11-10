@@ -1,6 +1,6 @@
 # # # # ################################  Custom schema application part #############
 
-- name: "assert variables"
+- name: "Assert variables"
   assert:
     that:
       - perun_ldap_schemas_perun_version is defined
@@ -123,7 +123,7 @@
       chdir: /tmp/schemas
   register: result
 
-- name: "read schema"
+- name: "Read schema"
   community.general.ldap_search:
     server_uri: "ldaps://{{ perun_ldap_ds389_server_name }}:636"
     bind_dn: "{{ perun_ldap_data_admin_dn }}"
@@ -187,50 +187,59 @@
           "{{ perun_ldap_ds389_aci_content }}"
      state: exact
 
-- name: "Check and add missing LDAP indexes"
-  shell: |
-    indexes="
-    cn eq
-    uid eq
-    member eq
-    memberUid eq
-    objectClass eq
-    uidNumber eq
-    gidNumber eq
-    perunVoId eq
-    eduPersonPrincipalNames eq
-    entryCSN eq
-    entryUUID eq
-    login eq
-    memberOfPerunVo eq
-    userCertificateSubject eq
-    entityID eq
-    assignedToResourceId eq
-    userIdentities eq
-    OIDCClientID eq
-    perunFacilityId eq
-    perunFacilityDn eq
-    perunUserId eq
-    perunGroupId eq
-    assignedGroupId eq
-    internalUserIdentifiers eq"
-  
-    echo "$indexes" | while read -r line; do
-      attrs=$(echo $line | cut -d' ' -f1)
-      types=$(echo $line | cut -d' ' -f2)
-      for attr in $(echo $attrs | tr ',' ' '); do
-        if ! dsconf {{ perun_ldap_ds389_instance_name }} backend index list userroot | grep  "cn=$attr"; then
-          dsconf {{ perun_ldap_ds389_instance_name }} backend index add --index-type $types --attr $attr userroot
-        fi
-      done
-    done
-  register: add_indexes_output
+- name: "Check if the indexies exist"
+  community.general.ldap_attrs:
+    dn: "cn={{ item }},cn=index,cn=userroot,cn=ldbm database,cn=plugins,cn=config"
+    attributes:
+      objectClass:
+        - "top"
+        - "nsIndex"
+      cn: "{{ item }}"
+    state: present
+    bind_dn: "{{ perun_ldap_data_admin_dn }}"
+    bind_pw: "{{ perun_ldap_data_password }}"
+    server_uri: "ldaps://{{ perun_ldap_ds389_server_name }}:636"
+  loop:
+        - "cn"
+        - "uid"
+        - "member"
+        - "memberUid"
+        - "objectClass"
+        - "uidNumber"
+        - "gidNumber"
+        - "perunVoId"
+        - "eduPersonPrincipalNames"
+        - "entryCSN"
+        - "entryUUID"
+        - "login"
+        - "memberOfPerunVo"
+        - "userCertificateSubject"
+        - "entityID"
+        - "assignedToResourceId"
+        - "userIdentities"
+        - "OIDCClientID"
+        - "perunFacilityId"
+        - "perunFacilityDn"
+        - "perunUserId"
+        - "perunGroupId"
+        - "assignedGroupId"
+        - "internalUserIdentifiers"
+  ignore_errors: true
+  register: create_index_results
+
+- name: "If indexies missing, crate a index object"
+  ansible.builtin.command:
+    cmd: "dsconf {{ perun_ldap_ds389_instance_name }} backend index add --index-type eq --attr {{ item }} userroot"
+  loop: "{{ create_index_results.results | selectattr('failed', 'defined') | selectattr('failed', 'eq', true) | map(attribute='item') | list }}"
+  register: create_dsconf_index
+  when: create_index_results.failed
+  ignore_errors: true
 
 - name: "Reindex missing indexes"
-  when: add_indexes_output.changed
+  when: create_dsconf_index.changed
   shell: |
     dsconf {{ perun_ldap_ds389_instance_name }} backend index reindex userroot
-  
+
 - name: "Create a cron job for LDAP backup"
   cron:
        name: "Everyday do backup of the LDAP hostel branch"
