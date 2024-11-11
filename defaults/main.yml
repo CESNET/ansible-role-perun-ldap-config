@@ -39,8 +39,12 @@ perun_ldap_ds389_aci_content:
 perun_ldap_backup_hostel: no
 perun_ldap_daily_backup_hour: 20
 perun_ldap_daily_backup_minute: 45
-#set var for max open file limit for LS
-perun_ldap_max_open_files_limits: false
 
+#set var for max open file limit for default value
+perun_ldap_max_open_files_limits: false
+perun_ldap_max_open_soft_files_user_ldap_value: "1024"   # Default soft limit for openLDAP users
+perun_ldap_max_open_hard_files_user_ldap_value: "4096"   # Default hard limit for openLDAP users
+perun_ldap_max_open_system_files_value: "1048576"        # Default limit for the entire system
+perun_ldap_no_file_limit_value: "4096"                   # Default limit similar to the hard limit for users
 
 
