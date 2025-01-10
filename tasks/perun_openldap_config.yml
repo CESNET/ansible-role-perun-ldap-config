@@ -132,51 +132,138 @@
   when: ansible_facts.services['slapd'] is not defined
   service_facts:
 
-- name: "Add limits to /etc/security/limits.conf"
-  lineinfile:
-        path: /etc/security/limits.conf
-        state: present
-        line: "{{ item }}"
-  loop:
-    - 'openldap soft nofile 20480'
-    - 'openldap hard nofile 40960'
-  notify: Reload limits
+- name: "set up limits for max open files for instance and display it"
+  when: perun_ldap_max_open_files_limits
+  block:
+    - name: "set soft open file limit for openldap user"
+      community.general.pam_limits:
+        domain: openldap
+        limit_type: soft
+        limit_item: nofile
+        value: "{{ perun_ldap_max_open_soft_files_user_ldap_value }}"
+      register: soft_limit
 
-- name: "Add system limit to /etc/sysctl.conf"
-  lineinfile:
-        path: /etc/sysctl.conf
-        state: present
-        line: 'fs.file-max = 500000'
-  notify: Reload sysctl
+    - name: "set hard open file limit for openldap user"
+      community.general.pam_limits:
+        domain: openldap
+        limit_type: hard
+        limit_item: nofile
+        value: "{{ perun_ldap_max_open_hard_files_user_ldap_value }}"
+      register: hard_limit
 
-- name: "Create systemd override config directory if it does not exist"
-  file:
+    - name: "set system-wide open files limit"
+      ansible.posix.sysctl:
+        name: fs.file-max
+        value: "{{ perun_ldap_max_open_system_files_value }}"
+      register: fs_file_max
+
+    - name: "create systemd override config directory if it does not exist"
+      ansible.builtin.file:
         path: /etc/systemd/system/slapd.service.d
         state: directory
         mode: '0755'
 
-- name: "Add LimitNOFILE to /etc/systemd/system/slapd.service.d/override.conf"
-  blockinfile:
+    - name: "add LimitNOFILE to systemd override configuration for slapd"
+      blockinfile:
         path: /etc/systemd/system/slapd.service.d/override.conf
         create: yes
         block: |
           [Service]
-          LimitNOFILE=40960
-  notify: Reload systemd
+          LimitNOFILE="{{ perun_ldap_no_file_limit_value }}"
+      register: ldap_nofile_limit
+      
+    - name: "reload systemd to apply override changes"
+      when:  soft_limit.changed or hard_limit.changed or fs_file_max.changed or ldap_nofile_limit.changed
+      ansible.builtin.systemd:
+        daemon_reload: true
+    
+    - name: "restart slapd service to apply new limits"
+      when: ldap_nofile_limit.changed
+      ansible.builtin.service:
+        name: slapd
+        state: restarted
 
-- name: "Check open file limit using ulimit"
-  command: bash -c 'ulimit -n'
-  register: ulimit_result
-  changed_when: false
+    - name: "get soft open file limit for openldap"
+      ansible.builtin.command: 
+        "grep '^openldap.*soft.*nofile' /etc/security/limits.conf"
+      register: ulimit_soft_result
+      when: soft_limit.changed
 
-- name: "Check system open file limit using sysctl"
-  command: sysctl fs.file-max
-  register: sysctl_result
-  changed_when: false
+    - name: "get hard open file limit for openldap"
+      ansible.builtin.command: 
+        "grep '^openldap.*hard.*nofile' /etc/security/limits.conf"
+      register: ulimit_hard_result
+      when: hard_limit.changed
 
-- name: "Display results of limit checks"
-  debug:
-        msg:
-          - "Current open file limit (ulimit -n): {{ ulimit_result.stdout }}"
-          - "System max open files limit (fs.file-max): {{ sysctl_result.stdout }}"
+    - name: "get system max open files limit"
+      ansible.builtin.command: 
+        "sysctl fs.file-max"
+      register: sysctl_result
+      when: fs_file_max.changed
 
+    - name: "get slapd LimitNOFILE setting"
+      ansible.builtin.command: 
+        "systemctl show -p LimitNOFILE slapd"
+
+      register: limitnofile_result
+      when: ldap_nofile_limit.changed
+
+    - name: "display configured soft open file limit for openldap"
+      when: soft_limit.changed
+      debug:
+        msg: "Configured soft open file limit for openldap: {{ ulimit_soft_result.stdout }}"
+
+    - name: "display configured hard open file limit for openldap"
+      when: hard_limit.changed
+      debug:
+        msg: "Configured hard open file limit for openldap: {{ ulimit_hard_result.stdout }}"
+
+    - name: "display system max open files limit (fs.file-max)"
+      when: fs_file_max.changed
+      debug:
+        msg: "System max open files limit (fs.file-max): {{ sysctl_result.stdout }}"
+
+    - name: "display slapd LimitNOFILE setting"
+      when: ldap_nofile_limit.changed
+      debug:
+        msg: "slapd LimitNOFILE setting: {{ limitnofile_result.stdout }}"
+
+- name: "set up defaults limits for max open files for instance"
+  when: not perun_ldap_max_open_files_limits
+  block:
+  - name: "remove soft and hard open file limits for openldap user"
+    ansible.builtin.lineinfile:
+      path: /etc/security/limits.conf
+      state: absent
+      regexp: '^openldap.*nofile'
+    register: remove_hard_soft_limits
+
+  - name: "reset system-wide open files limit to default"
+    ansible.posix.sysctl:
+      name: fs.file-max
+      state: absent
+    register: fs_file_max_default
+
+  - name: "remove systemd override config directory for slapd"
+    ansible.builtin.file:
+      path: /etc/systemd/system/slapd.service.d/override.conf
+      state: absent
+    register: remove_conf
+
+  - name: "remove systemd override directory if empty"
+    when: remove_conf.changed
+    ansible.builtin.file:
+      path: /etc/systemd/system/slapd.service.d
+      state: absent
+    register: remove_slapd_dir
+
+  - name: "reload systemd to apply override changes"
+    when:  remove_hard_soft_limits.changed or fs_file_max_default.changed or remove_conf.changed
+    ansible.builtin.systemd:
+      daemon_reload: true
+    
+  - name: "restart slapd service to apply new limits"
+    when: remove_conf.changed
+    ansible.builtin.service:
+      name: slapd
+      state: restarted
