@@ -169,7 +169,7 @@
         create: yes
         block: |
           [Service]
-          LimitNOFILE="{{ perun_ldap_no_file_limit_value }}"
+          LimitNOFILE={{ perun_ldap_no_file_limit_value }}
       register: ldap_nofile_limit
 
     - name: "reload systemd to apply override changes"
