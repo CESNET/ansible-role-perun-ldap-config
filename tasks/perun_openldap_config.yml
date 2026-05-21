@@ -231,39 +231,39 @@
 - name: "set up defaults limits for max open files for instance"
   when: not perun_ldap_max_open_files_limits
   block:
-  - name: "remove soft and hard open file limits for openldap user"
-    ansible.builtin.lineinfile:
-      path: /etc/security/limits.conf
-      state: absent
-      regexp: '^openldap.*nofile'
-    register: remove_hard_soft_limits
+    - name: "remove soft and hard open file limits for openldap user"
+      ansible.builtin.lineinfile:
+        path: /etc/security/limits.conf
+        state: absent
+        regexp: '^openldap.*nofile'
+      register: remove_hard_soft_limits
 
-  - name: "reset system-wide open files limit to default"
-    ansible.posix.sysctl:
-      name: fs.file-max
-      state: absent
-    register: fs_file_max_default
+    - name: "reset system-wide open files limit to default"
+      ansible.posix.sysctl:
+        name: fs.file-max
+        state: absent
+      register: fs_file_max_default
 
-  - name: "remove systemd override config directory for slapd"
-    ansible.builtin.file:
-      path: /etc/systemd/system/slapd.service.d/override.conf
-      state: absent
-    register: remove_conf
+    - name: "remove systemd override config directory for slapd"
+      ansible.builtin.file:
+        path: /etc/systemd/system/slapd.service.d/override.conf
+        state: absent
+      register: remove_conf
 
-  - name: "remove systemd override directory if empty"
-    when: remove_conf.changed
-    ansible.builtin.file:
-      path: /etc/systemd/system/slapd.service.d
-      state: absent
-    register: remove_slapd_dir
+    - name: "remove systemd override directory if empty"
+      when: remove_conf.changed
+      ansible.builtin.file:
+        path: /etc/systemd/system/slapd.service.d
+        state: absent
+      register: remove_slapd_dir
 
-  - name: "reload systemd to apply override changes"
-    when:  remove_hard_soft_limits.changed or fs_file_max_default.changed or remove_conf.changed
-    ansible.builtin.systemd:
-      daemon_reload: true
+    - name: "reload systemd to apply override changes"
+      when:  remove_hard_soft_limits.changed or fs_file_max_default.changed or remove_conf.changed
+      ansible.builtin.systemd:
+        daemon_reload: true
 
-  - name: "restart slapd service to apply new limits"
-    when: remove_conf.changed
-    ansible.builtin.service:
-      name: slapd
-      state: restarted
+    - name: "restart slapd service to apply new limits"
+      when: remove_conf.changed
+      ansible.builtin.service:
+        name: slapd
+        state: restarted
