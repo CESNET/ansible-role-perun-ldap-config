@@ -36,6 +36,8 @@ perun_ldap_ds389_aci_content:
   - (target="ldap:///{{ perun_ldap_basedn }}")(version 3.0; acl "User search access"; allow (search) userdn="ldap:///users";)
 
 perun_ldap_backup_hostel: no
+# index of hostel DB is 3 when replication is enabled
+perun_ldap_backup_hostel_index: "{{ perun_ldap_master_replica | bool | ternary(3, 2) }}"
 perun_ldap_daily_backup_hour: 20
 perun_ldap_daily_backup_minute: 45
 
